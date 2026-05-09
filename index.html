@@ -145,8 +145,13 @@ async function signIn(){
 }
 
 async function init(){
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    await sb.auth.getSession()
+    await new Promise(r => setTimeout(r, 500))
+  }
+
   const { data:{ session } } = await sb.auth.getSession()
-  if(session){ U = session.user; await loadProfile(); loadHome(); show('s-home') }
+  if(session){ U = session.user; await loadProfile(); loadHome(); show('s-home'); history.replaceState(null,'','/') }
   else show('s-login')
 
   sb.auth.onAuthStateChange(async (_e, s)=>{
