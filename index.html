@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Ready Set Fight</title>
+<title>The House Fight Game</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -74,7 +74,7 @@ label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.1em;text-tr
 <!-- HOME -->
 <div id="s-home" class="screen">
   <nav class="nav">
-    <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.06em">Ready Set Fight</span>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.06em">The House Fight Game</span>
     <div style="display:flex;gap:8px;align-items:center">
       <button onclick="showLeaderboard()" class="btn bg" style="width:auto;padding:4px 10px;font-size:.78rem">🏆</button>
       <div id="home-avatar" onclick="showProfile()" style="width:32px;height:32px;border-radius:50%;background:var(--red);color:var(--white);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.75rem;cursor:pointer"></div>
@@ -119,8 +119,8 @@ label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.1em;text-tr
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://riydyvefgftncbdrbpiv.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpeWR5dmVmZ2Z0bmNiZHJicGl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjA2ODMsImV4cCI6MjA5MzkzNjY4M30.UBjN6JwIXQt32v2plM5H0yLyotusp1rpu8vMakD1pzs'
+const SUPABASE_URL = 'REPLACE_SUPABASE_URL'
+const SUPABASE_ANON_KEY = 'REPLACE_SUPABASE_ANON_KEY'
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const COLORS = ['#e63329','#f5c842','#1db954','#3b82f6','#a855f7','#f97316','#ec4899','#06b6d4','#84cc16','#f43f5e']
@@ -145,30 +145,61 @@ async function signIn(){
 }
 
 async function init(){
-  if (window.location.hash && window.location.hash.includes('access_token')) {
-    await sb.auth.getSession()
-    await new Promise(r => setTimeout(r, 500))
+  // Wait briefly for hash-based OAuth redirect to settle
+  if(window.location.hash && window.location.hash.includes('access_token')){
+    await new Promise(r => setTimeout(r, 800))
+    history.replaceState(null, '', '/')
   }
 
   const { data:{ session } } = await sb.auth.getSession()
-  if(session){ U = session.user; await loadProfile(); loadHome(); show('s-home'); history.replaceState(null,'','/') }
-  else show('s-login')
+  if(session){ U = session.user; await loadProfile(); loadHome(); show('s-home'); return }
+  
+  show('s-login')
 
   sb.auth.onAuthStateChange(async (_e, s)=>{
-    if(s){ U = s.user; await loadProfile(); loadHome(); show('s-home') }
-    else { U=null; P=null; show('s-login') }
+    if(s && s.user){
+      U = s.user
+      await loadProfile()
+      loadHome()
+      show('s-home')
+    } else {
+      U=null; P=null; show('s-login')
+    }
   })
 }
 
 async function loadProfile(id){
   const tid = id || U?.id
   if(!tid) return
-  const r = await fetch('/api/profile?id='+tid)
-  const d = await r.json()
-  if(!id) P = d.profile
-  const av = document.getElementById('home-avatar')
-  if(av && P){ av.textContent=ini(P.display_name); av.style.background=P.avatar_color||'var(--red)' }
-  return d
+  try {
+    const r = await fetch('/api/profile?id='+tid)
+    const d = await r.json()
+    if(!id){
+      if(d.profile){
+        P = d.profile
+      } else {
+        // Profile not created yet — create it manually
+        const createRes = await fetch('/api/profile', {
+          method: 'PATCH',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            id: tid,
+            display_name: U?.user_metadata?.full_name || U?.email?.split('@')[0] || 'Fighter',
+            avatar_color: '#e63329'
+          })
+        })
+        const cd = await createRes.json()
+        P = cd.profile || { id: tid, display_name: 'Fighter', avatar_color: '#e63329', total_wins:0, total_losses:0, total_rounds:0 }
+      }
+    }
+    const av = document.getElementById('home-avatar')
+    if(av && P){ av.textContent=ini(P.display_name); av.style.background=P.avatar_color||'var(--red)' }
+    return d
+  } catch(e) {
+    console.error('loadProfile error:', e)
+    if(!id) P = { id: tid, display_name: 'Fighter', avatar_color: '#e63329', total_wins:0, total_losses:0, total_rounds:0 }
+    return null
+  }
 }
 
 async function signOut(){ await sb.auth.signOut() }

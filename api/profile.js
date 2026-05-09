@@ -13,11 +13,15 @@ module.exports = async (req, res) => {
       if (!id) return res.status(400).json({ error: 'Missing id' })
       const { data: profile } = await db.from('profiles').select('*').eq('id', id).single()
       const { data: history } = await db.from('fight_results').select('*').eq('player_id', id).order('created_at', { ascending: false }).limit(20)
-      return res.status(200).json({ profile, history: history || [] })
+      return res.status(200).json({ profile: profile || null, history: history || [] })
     }
     if (req.method === 'PATCH') {
       const { id, display_name, avatar_color } = req.body
-      const { data, error } = await db.from('profiles').update({ display_name, avatar_color }).eq('id', id).select().single()
+      if (!id) return res.status(400).json({ error: 'Missing id' })
+      // upsert so it works for both create and update
+      const { data, error } = await db.from('profiles')
+        .upsert({ id, display_name, avatar_color }, { onConflict: 'id' })
+        .select().single()
       if (error) throw error
       return res.status(200).json({ profile: data })
     }
