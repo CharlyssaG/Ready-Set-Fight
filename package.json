@@ -1,0 +1,9 @@
+{
+  "name": "house-fight-game",
+  "version": "3.0.0",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@supabase/supabase-js": "^2.43.0"
+  }
+}

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>The House Fight Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--black:#0a0a0a;--white:#f5f0e8;--red:#e63329;--yellow:#f5c842;--green:#1db954;--purple:#7c3aed;--pl:#a78bfa;--cb:#141414;--border:#2a2a2a;--dim:#888;--r:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+h1,h2,.bb{font-family:'Bebas Neue',sans-serif;letter-spacing:.04em}
+.screen{display:none;min-height:100vh;flex-direction:column}
+.screen.active{display:flex}
+.page{max-width:520px;margin:0 auto;padding:1.5rem 1.25rem;width:100%}
+.btn{display:block;width:100%;padding:.9rem 1.5rem;font-family:'Bebas Neue',sans-serif;font-size:1.25rem;letter-spacing:.08em;border:none;border-radius:var(--r);cursor:pointer;transition:transform .1s;text-align:center}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.br{background:var(--red);color:var(--white)}
+.bw{background:var(--white);color:var(--black)}
+.bp{background:var(--purple);color:var(--white)}
+.bg{background:transparent;color:var(--white);border:1.5px solid #333;font-family:'DM Sans',sans-serif;font-size:.875rem;letter-spacing:0;padding:.65rem 1.25rem}
+.bg:hover{border-color:#555}
+input[type=text],input[type=number]{width:100%;background:var(--cb);border:1.5px solid var(--border);border-radius:var(--r);color:var(--white);font-family:'DM Sans',sans-serif;font-size:1rem;padding:.8rem 1rem;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--red)}
+input::placeholder{color:#555}
+label{display:block;font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:.45rem}
+.field{margin-bottom:1.1rem}
+.card{background:var(--cb);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem 1.25rem}
+.nav{background:#111;border-bottom:1px solid var(--border);padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.slbl{font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:.65rem}
+.chip{display:inline-block;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+.chip-red{background:#2a0a0a;color:var(--red);border:1px solid var(--red)}
+.chip-green{background:#0f3320;color:var(--green);border:1px solid var(--green)}
+.chip-dim{background:#1a1a1a;color:var(--dim);border:1px solid #333}
+.spinner{width:40px;height:40px;border:3px solid #222;border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto}
+.spinner.purple{border-top-color:var(--pl)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fi{animation:fi .3s ease both}
+@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* TITLE */
+#s-login{justify-content:center;align-items:center;text-align:center;position:relative;overflow:hidden;background:var(--black)}
+.tbg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 30%,#3a0a0a 0%,transparent 65%);pointer-events:none}
+/* RESULT CARDS */
+.qbox{border-radius:9px;padding:.875rem 1rem;border-left:3px solid #333;background:#0c0c0c;margin-top:.65rem}
+.qbox.win{border-left-color:var(--green)}
+.qbox.loss{border-left-color:#3a1212}
+/* CHAMP */
+.chbg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,#1a3a10 0%,transparent 65%);pointer-events:none}
+.troph{font-size:4.5rem;margin-bottom:.875rem;animation:float 3s ease-in-out infinite;display:block}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.confetti-piece{position:fixed;border-radius:2px;animation:cf linear forwards;pointer-events:none;z-index:999}
+@keyframes cf{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="s-login" class="screen active">
+  <div class="tbg"></div>
+  <div style="position:relative;z-index:1;padding:2.5rem 1.5rem;max-width:400px;width:100%;text-align:center">
+    <p style="font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;color:var(--red);margin-bottom:.75rem;font-weight:500">AI-Powered Party Game</p>
+    <h1 style="font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,14vw,5rem);line-height:.92;margin-bottom:1rem">The<br><span style="color:var(--red)">House</span><br>Fight<br>Game</h1>
+    <p style="font-size:.9rem;color:var(--dim);margin-bottom:2.5rem;line-height:1.6">One fighter. Everyone picks a challenger.<br>The AI runs the numbers. The world watches.</p>
+    <button id="google-btn" onclick="signIn()" style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:1rem;background:var(--red);color:var(--white);border:none;border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:1rem;cursor:pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Sign in with Google
+    </button>
+    <p style="font-size:.75rem;color:var(--dim);margin-top:1.25rem">Stats and history saved across every game.</p>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="s-home" class="screen">
+  <nav class="nav">
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.06em">The House Fight Game</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="showLeaderboard()" class="btn bg" style="width:auto;padding:4px 10px;font-size:.78rem">🏆</button>
+      <div id="home-avatar" onclick="showProfile()" style="width:32px;height:32px;border-radius:50%;background:var(--red);color:var(--white);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.75rem;cursor:pointer"></div>
+    </div>
+  </nav>
+  <div class="page">
+    <div id="home-content"></div>
+  </div>
+</div>
+
+<!-- ROOM -->
+<div id="s-room" class="screen">
+  <nav class="nav">
+    <button onclick="show('s-home');loadHome()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem">← Home</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="room-code-badge" class="chip chip-dim" style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.1em"></span>
+      <button onclick="copyCode()" class="btn bg" style="width:auto;padding:4px 10px;font-size:.75rem" id="copy-btn">Copy code</button>
+    </div>
+  </nav>
+  <div class="page" id="room-content"></div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="s-leaderboard" class="screen">
+  <nav class="nav">
+    <button onclick="show('s-home')" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem">← Home</button>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">Global Leaderboard</span>
+    <div></div>
+  </nav>
+  <div class="page" id="leaderboard-content"></div>
+</div>
+
+<!-- PROFILE -->
+<div id="s-profile" class="screen">
+  <nav class="nav">
+    <button onclick="show('s-home')" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem">← Home</button>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">Profile</span>
+    <div></div>
+  </nav>
+  <div class="page" id="profile-content"></div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'REPLACE_SUPABASE_URL'
+const SUPABASE_ANON_KEY = 'REPLACE_SUPABASE_ANON_KEY'
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+const COLORS = ['#e63329','#f5c842','#1db954','#3b82f6','#a855f7','#f97316','#ec4899','#06b6d4','#84cc16','#f43f5e']
+function ini(n){ return (n||'P').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase() }
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let U = null   // current user
+let P = null   // current profile
+let currentRoom = null
+let currentRound = null
+let roomChannel = null
+
+// ── SCREENS ─────────────────────────────────────────────────────────────────
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+}
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+async function signIn(){
+  await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: window.location.origin+'/' } })
+}
+
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession()
+  if(session){ U = session.user; await loadProfile(); loadHome(); show('s-home') }
+  else show('s-login')
+
+  sb.auth.onAuthStateChange(async (_e, s)=>{
+    if(s){ U = s.user; await loadProfile(); loadHome(); show('s-home') }
+    else { U=null; P=null; show('s-login') }
+  })
+}
+
+async function loadProfile(id){
+  const tid = id || U?.id
+  if(!tid) return
+  const r = await fetch('/api/profile?id='+tid)
+  const d = await r.json()
+  if(!id) P = d.profile
+  const av = document.getElementById('home-avatar')
+  if(av && P){ av.textContent=ini(P.display_name); av.style.background=P.avatar_color||'var(--red)' }
+  return d
+}
+
+async function signOut(){ await sb.auth.signOut() }
+
+// ── HOME ─────────────────────────────────────────────────────────────────────
+function loadHome(){
+  const c = document.getElementById('home-content')
+  const wr = P && P.total_rounds > 0 ? Math.round((P.total_wins/P.total_rounds)*100) : 0
+  c.innerHTML = `
+    <div class="fi" style="text-align:center;padding:2rem 0 1.5rem">
+      <h1 style="font-family:'Bebas Neue',sans-serif;font-size:clamp(2.5rem,12vw,4rem);line-height:.92;margin-bottom:.75rem">The<br><span style="color:var(--red)">House</span><br>Fight Game</h1>
+      <p style="color:var(--dim);margin-bottom:1.5rem">Welcome back, <strong style="color:var(--white)">${P?.display_name||'Fighter'}</strong></p>
+    </div>
+    ${P&&P.total_rounds>0?`<div class="card fi" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;text-align:center;margin-bottom:1.25rem">
+      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;color:var(--green)">${P.total_wins}</div><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Wins</div></div>
+      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem">${wr}%</div><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Win rate</div></div>
+      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;color:var(--yellow)">${P.biggest_upset_pct||0}%</div><div style="font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Best upset</div></div>
+    </div>`:''}
+    <div style="display:grid;gap:10px;margin-bottom:1rem">
+      <button onclick="showCreateRoom()" class="btn br">⚔️ Create a room</button>
+      <button onclick="showJoinRoom()" class="btn bg" style="padding:1rem;font-size:1rem">🚪 Join with room code</button>
+      <button onclick="showRandomMode()" class="btn bp" style="padding:1rem;font-size:1rem">🎲 Random fighter mode</button>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="showLeaderboard()" class="btn bg" style="flex:1;padding:.65rem;font-size:.85rem">🏆 Leaderboard</button>
+      <button onclick="showProfile()" class="btn bg" style="flex:1;padding:.65rem;font-size:.85rem">👤 Profile</button>
+      <button onclick="signOut()" class="btn bg" style="flex:1;padding:.65rem;font-size:.85rem">Sign out</button>
+    </div>`
+}
+
+// ── CREATE ROOM ───────────────────────────────────────────────────────────────
+function showCreateRoom(prefillName='', prefillDesc=''){
+  const c = document.getElementById('home-content')
+  c.innerHTML = `
+    <button onclick="loadHome()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem;margin-bottom:1.25rem">← Back</button>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.4rem">Create a room</h2>
+    <p style="font-size:.875rem;color:var(--dim);margin-bottom:1.75rem;line-height:1.6">Set the anchor fighter. Share the code. Everyone joins on their own phone.</p>
+    <div class="field"><label>Anchor fighter name</label><input type="text" id="cr-name" value="${prefillName}" placeholder="e.g. Darth Vader" maxlength="60"></div>
+    <div class="field"><label>Description (optional)</label><input type="text" id="cr-desc" value="${prefillDesc}" placeholder="e.g. Sith Lord, Force choke, lightsaber" maxlength="120"></div>
+    <div class="field" style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="cr-pub" checked style="width:auto"><label for="cr-pub" style="margin:0">Show on public lobby</label></div>
+    <p id="cr-err" style="color:var(--red);font-size:.85rem;margin-bottom:1rem;display:none"></p>
+    <button onclick="createRoom()" class="btn br" id="cr-btn">Create room →</button>`
+}
+
+async function createRoom(){
+  const name = document.getElementById('cr-name').value.trim()
+  const desc = document.getElementById('cr-desc').value.trim()
+  const pub = document.getElementById('cr-pub').checked
+  const err = document.getElementById('cr-err')
+  const btn = document.getElementById('cr-btn')
+  if(!name){ err.textContent='Enter a fighter name'; err.style.display='block'; return }
+  btn.disabled=true; btn.textContent='Creating…'
+  const r = await fetch('/api/rooms-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hostId:U.id,anchorName:name,anchorDesc:desc,isPublic:pub})})
+  const d = await r.json()
+  if(d.error){ err.textContent=d.error; err.style.display='block'; btn.disabled=false; btn.textContent='Create room →'; return }
+  openRoom(d.room.code)
+}
+
+// ── JOIN ROOM ─────────────────────────────────────────────────────────────────
+function showJoinRoom(){
+  const c = document.getElementById('home-content')
+  c.innerHTML = `
+    <button onclick="loadHome()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem;margin-bottom:1.25rem">← Back</button>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.4rem">Join a room</h2>
+    <p style="font-size:.875rem;color:var(--dim);margin-bottom:1.75rem">Enter the 6-character code from your host.</p>
+    <div class="field"><label>Room code</label><input type="text" id="jc" placeholder="FGHT42" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;font-size:1.5rem;text-align:center" oninput="this.value=this.value.toUpperCase()"></div>
+    <p id="j-err" style="color:var(--red);font-size:.85rem;margin-bottom:1rem;display:none"></p>
+    <button onclick="joinRoom()" class="btn br" id="j-btn">Join room →</button>`
+}
+
+async function joinRoom(){
+  const code = document.getElementById('jc').value.trim()
+  const err = document.getElementById('j-err')
+  const btn = document.getElementById('j-btn')
+  if(!code){ err.textContent='Enter a code'; err.style.display='block'; return }
+  btn.disabled=true; btn.textContent='Joining…'
+  const r = await fetch('/api/rooms-join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code.toUpperCase(),playerId:U.id})})
+  const d = await r.json()
+  if(d.error){ err.textContent=d.error; err.style.display='block'; btn.disabled=false; btn.textContent='Join room →'; return }
+  openRoom(code.toUpperCase())
+}
+
+// ── RANDOM MODE ───────────────────────────────────────────────────────────────
+async function showRandomMode(){
+  const c = document.getElementById('home-content')
+  c.innerHTML = `
+    <button onclick="loadHome()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:.875rem;margin-bottom:1.25rem">← Back</button>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.4rem">Random fighter</h2>
+    <p style="font-size:.875rem;color:var(--dim);margin-bottom:1.75rem">The AI picks the anchor. Nobody chooses.</p>
+    <div id="rand-slot" style="background:#0e0a1a;border:2px solid #3b1a7a;border-radius:var(--r);padding:1.5rem;text-align:center;margin-bottom:1.25rem;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div class="spinner purple"></div>
+    </div>
+    <div id="rand-btns" style="display:none;display:flex;gap:9px">
+      <button onclick="showRandomMode()" class="btn bg" style="flex:1">🎲 Reroll</button>
+      <button id="rand-use" class="btn bp" style="flex:2">Use this →</button>
+    </div>`
+  const r = await fetch('/api/random-fighter')
+  const f = await r.json()
+  document.getElementById('rand-slot').innerHTML = `
+    <p style="font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--pl);margin-bottom:.4rem">${f.origin||'Random Fighter'}</p>
+    <p style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.3rem">${f.name}</p>
+    <p style="font-size:.8rem;color:var(--dim)">${f.desc||''}</p>`
+  document.getElementById('rand-btns').style.display='flex'
+  document.getElementById('rand-use').onclick = ()=>showCreateRoom(f.name, f.desc||'')
+}
+
+// ── ROOM ──────────────────────────────────────────────────────────────────────
+async function openRoom(code){
+  if(roomChannel){ await sb.removeChannel(roomChannel); roomChannel=null }
+  const { data:room } = await sb.from('rooms').select('*').eq('code',code).single()
+  if(!room){ alert('Room not found'); return }
+  currentRoom = room
+
+  // join if not already in
+  await fetch('/api/rooms-join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,playerId:U.id})})
+
+  document.getElementById('room-code-badge').textContent = code
+  show('s-room')
+  await renderRoom()
+
+  // subscribe to realtime
+  roomChannel = sb.channel('room-'+room.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'id=eq.'+room.id},async()=>{ const {data:r}=await sb.from('rooms').select('*').eq('id',room.id).single(); currentRoom=r; await renderRoom() })
+    .on('postgres_changes',{event:'*',schema:'public',table:'submissions'},()=>renderRoom())
+    .on('postgres_changes',{event:'*',schema:'public',table:'fight_results'},()=>renderRoom())
+    .on('postgres_changes',{event:'*',schema:'public',table:'room_players',filter:'room_id=eq.'+room.id},()=>renderRoom())
+    .subscribe()
+}
+
+async function renderRoom(){
+  if(!currentRoom) return
+  const c = document.getElementById('room-content')
+  const { data:round } = await sb.from('rounds').select('*').eq('room_id',currentRoom.id).order('round_number',{ascending:false}).limit(1).single()
+  currentRound = round
+  const { data:players } = await sb.from('room_players').select('*, profiles(*)').eq('room_id',currentRoom.id)
+  const { data:subs } = round ? await sb.from('submissions').select('*, profiles(*)').eq('round_id',round.id) : {data:[]}
+  const { data:results } = round ? await sb.from('fight_results').select('*').eq('round_id',round.id) : {data:[]}
+  const isHost = currentRoom.host_id === U?.id
+  const mySub = (subs||[]).find(s=>s.player_id===U?.id)
+  const status = currentRoom.status
+
+  let html = `
+    <div class="card fi" style="background:linear-gradient(135deg,#1a0505,#0a0a0a);border:1px solid #3a0a0a;margin-bottom:1.1rem">
+      <div style="font-size:.68rem;color:var(--red);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.3rem">Anchor fighter — Round ${round?.round_number||1}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;line-height:1;margin-bottom:.25rem">${currentRoom.anchor_name}</div>
+      ${currentRoom.anchor_desc?`<div style="font-size:.8rem;color:var(--dim)">${currentRoom.anchor_desc}</div>`:''}
+    </div>
+    <div style="margin-bottom:1.1rem">
+      <p class="slbl">Players (${(players||[]).length}) — share code <strong style="color:var(--white)">${currentRoom.code}</strong></p>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${(players||[]).map(p=>`<div style="display:flex;align-items:center;gap:5px;background:var(--cb);border:1px solid var(--border);border-radius:99px;padding:3px 9px 3px 3px">
+          <div style="width:22px;height:22px;border-radius:50%;background:${p.profiles?.avatar_color||'var(--red)'};color:var(--white);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.6rem">${ini(p.profiles?.display_name||'P')}</div>
+          <span style="font-size:.78rem">${p.profiles?.display_name||'Player'}</span>
+          ${p.player_id===currentRoom.host_id?'<span style="font-size:.6rem">👑</span>':''}
+        </div>`).join('')}
+      </div>
+    </div>`
+
+  if(status==='submitting'){
+    if(!mySub){
+      html += `<div class="card" style="margin-bottom:1rem">
+        <div class="field"><label>Your challenger vs ${currentRoom.anchor_name}</label><input type="text" id="ch-name" placeholder="e.g. Pootie Tang" maxlength="60"></div>
+        <div class="field"><label>Description (optional)</label><input type="text" id="ch-desc" placeholder="e.g. Belt master, sa da tay" maxlength="120"></div>
+        <button onclick="submitChallenger()" class="btn br" id="ch-btn">Submit challenger</button>
+      </div>`
+    } else {
+      html += `<div class="card" style="margin-bottom:1rem;text-align:center;background:#0f1a14;border:1px solid var(--green)">
+        <p style="font-size:.75rem;color:var(--green);margin-bottom:4px">✓ You submitted</p>
+        <p style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem">${mySub.challenger_name}</p>
+        ${mySub.challenger_desc?`<p style="font-size:.78rem;color:var(--dim)">${mySub.challenger_desc}</p>`:''}
+      </div>`
+    }
+
+    html += `<p class="slbl" style="margin-top:.5rem">Submissions (${(subs||[]).length}/${(players||[]).length})</p>`
+    html += (players||[]).map(p=>{
+      const sub = (subs||[]).find(s=>s.player_id===p.player_id)
+      return `<div style="display:flex;align-items:center;gap:9px;padding:.6rem .875rem;background:var(--cb);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;opacity:${sub?1:.55}">
+        <div style="width:22px;height:22px;border-radius:50%;background:${p.profiles?.avatar_color||'#888'};color:var(--white);display:flex;align-items:center;justify-content:center;font-size:.6rem;flex-shrink:0">${ini(p.profiles?.display_name||'P')}</div>
+        <span style="font-size:.85rem;flex:1">${p.profiles?.display_name||'Player'}</span>
+        ${sub?'<span style="color:var(--green)">✓</span>':'<span style="font-size:.72rem;color:var(--dim)">waiting…</span>'}
+      </div>`
+    }).join('')
+
+    if(isHost && (subs||[]).length > 0){
+      html += `<button onclick="simulate()" class="btn br" style="margin-top:1rem" id="sim-btn">Simulate all ${(subs||[]).length} fights →</button>`
+    } else if(!isHost){
+      html += `<p style="font-size:.8rem;color:var(--dim);text-align:center;margin-top:1rem">Waiting for host to simulate…</p>`
+    }
+  }
+
+  if(status==='simulating'){
+    html += `<div class="fi" style="text-align:center;padding:2rem 0">
+      <div class="spinner" style="margin-bottom:1rem"></div>
+      <p style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;margin-bottom:.4rem">Running the simulation</p>
+      <p style="font-size:.85rem;color:var(--dim)">The AI is deciding who walks away…</p>
+    </div>`
+  }
+
+  if((status==='results'||status==='complete') && (results||[]).length > 0){
+    html += `<p class="slbl">Round ${round?.round_number} results</p>`
+    const sorted = [...(results||[])].sort((a,b)=>(b.winner==='challenger'?1:0)-(a.winner==='challenger'?1:0))
+    sorted.forEach((res,i)=>{
+      const pl = (players||[]).find(p=>p.player_id===res.player_id)
+      const isW = res.winner==='challenger'
+      const col = pl?.profiles?.avatar_color||'#888'
+      const cp = res.challenger_win_pct
+      const stats = (res.stats||[]).map(s=>`
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+          <span style="font-size:.68rem;color:var(--dim);width:85px;flex-shrink:0">${s.name}</span>
+          <div style="flex:1;height:4px;background:#222;border-radius:2px;overflow:hidden"><div style="height:100%;width:${Math.round(s.b/(s.a+s.b)*100)}%;background:${col};border-radius:2px"></div></div>
+          <span style="font-size:.68rem;font-weight:600;width:20px;text-align:right;color:var(--dim)">${s.b}</span>
+        </div>`).join('')
+      html += `<div class="card fi" style="margin-bottom:.75rem;animation-delay:${i*.08}s;border:1px solid ${isW?'var(--green)':'var(--border)'};opacity:${isW?1:.8}">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:.75rem">
+          <div style="width:34px;height:34px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.8rem;flex-shrink:0">${ini(res.challenger_name)}</div>
+          <div style="flex:1"><div style="font-size:.9rem;font-weight:500">${res.challenger_name}</div><div style="font-size:.72rem;color:var(--dim)">Picked by ${pl?.profiles?.display_name||'Player'}</div></div>
+          <span style="font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:4px;background:${isW?'#0f3320':'#2a1010'};color:${isW?'var(--green)':'#c04040'}">${isW?'WIN':'LOSS'}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:.4rem">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;color:${isW?'var(--green)':'#c04040'}">${cp}%</span>
+          <span style="font-size:.72rem;color:var(--dim)">win probability vs ${currentRoom.anchor_name}</span>
+        </div>
+        ${stats}
+        <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;margin:.65rem 0">
+          <div style="width:${cp}%;background:${col}"></div><div style="width:${100-cp}%;background:var(--red)"></div>
+        </div>
+        <div class="qbox ${isW?'win':'loss'}">
+          <p style="font-size:.6rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:.5rem">${isW?'🏆':'💀'} How it went down</p>
+          <p style="font-size:.88rem;line-height:1.65;color:var(--white)">${res.quip||res.verdict||'The simulation has concluded.'}</p>
+          ${res.verdict?`<p style="font-size:.74rem;color:#777;font-style:italic;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #1e1e1e">${res.verdict}</p>`:''}
+        </div>
+        ${res.is_upset?'<div style="margin-top:.5rem"><span class="chip" style="background:#1a1000;color:var(--yellow);border:1px solid var(--yellow)">🔥 Upset!</span></div>':''}
+      </div>`
+    })
+
+    if(isHost){
+      html += `<div class="card" style="margin-top:1.5rem;background:#111">
+        <p class="slbl">Start a new round</p>
+        <div class="field"><label>New anchor fighter</label><input type="text" id="nr-name" placeholder="e.g. Monique from Precious" maxlength="60"></div>
+        <div class="field"><label>Description (optional)</label><input type="text" id="nr-desc" placeholder="e.g. Zero remorse, frying pan" maxlength="120"></div>
+        <button onclick="newRound()" class="btn br">Start new round →</button>
+      </div>`
+    }
+  }
+
+  c.innerHTML = html
+}
+
+async function submitChallenger(){
+  const name = document.getElementById('ch-name').value.trim()
+  if(!name||!currentRound) return
+  const btn = document.getElementById('ch-btn')
+  btn.disabled=true; btn.textContent='Submitting…'
+  await fetch('/api/rooms-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roundId:currentRound.id,playerId:U.id,challengerName:name,challengerDesc:document.getElementById('ch-desc').value.trim()})})
+}
+
+async function simulate(){
+  if(!currentRound) return
+  const btn = document.getElementById('sim-btn')
+  if(btn){ btn.disabled=true; btn.textContent='Simulating…' }
+  await fetch('/api/rooms-simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roundId:currentRound.id,roomId:currentRoom.id})})
+}
+
+async function newRound(){
+  const name = document.getElementById('nr-name').value.trim()
+  if(!name) return
+  await fetch('/api/rooms-new-round',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:currentRoom.id,anchorName:name,anchorDesc:document.getElementById('nr-desc').value.trim(),hostId:U.id})})
+}
+
+function copyCode(){
+  navigator.clipboard.writeText(currentRoom?.code||'')
+  const btn = document.getElementById('copy-btn')
+  btn.textContent='✓ Copied'; setTimeout(()=>btn.textContent='Copy code',2000)
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+async function showLeaderboard(){
+  show('s-leaderboard')
+  const c = document.getElementById('leaderboard-content')
+  c.innerHTML = '<div style="text-align:center;padding:3rem 0"><div class="spinner"></div></div>'
+  const r = await fetch('/api/leaderboard')
+  const d = await r.json()
+  const board = d.leaderboard||[]
+  c.innerHTML = `
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.4rem">Hall of Champions</h2>
+    <p style="font-size:.875rem;color:var(--dim);margin-bottom:1.5rem">Ranked by total wins.</p>
+    ${board.length===0?'<div class="card" style="text-align:center;padding:3rem;color:var(--dim)">No one on the board yet. Play some rounds!</div>':
+    board.map((p,i)=>`<div class="card fi" style="display:flex;align-items:center;gap:14px;margin-bottom:.65rem;animation-delay:${i*.04}s;cursor:pointer;border:1px solid ${i<3?['#f5c84222','#aaaaaa22','#cd7f3222'][i]:'var(--border)'}" onclick="showProfileById('${p.id}')">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;width:28px;text-align:center;color:${i<3?['var(--yellow)','#aaa','#cd7f32'][i]:'var(--dim)'}">
+        ${['🥇','🥈','🥉'][i]||i+1}
+      </div>
+      <div style="width:40px;height:40px;border-radius:50%;background:${p.avatar_color||'var(--red)'};color:var(--white);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.9rem;flex-shrink:0">${ini(p.display_name)}</div>
+      <div style="flex:1">
+        <div style="font-weight:500;margin-bottom:2px">${p.display_name}</div>
+        <div style="font-size:.72rem;color:var(--dim)">${p.win_rate}% win rate · ${p.total_rounds} rounds</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--green)">${p.total_wins}</div>
+        <div style="font-size:.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em">wins</div>
+      </div>
+    </div>`).join('')}`
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────────────────
+async function showProfile(){ await showProfileById(U?.id) }
+async function showProfileById(id){
+  show('s-profile')
+  const c = document.getElementById('profile-content')
+  c.innerHTML = '<div style="text-align:center;padding:3rem 0"><div class="spinner"></div></div>'
+  const d = await loadProfile(id)
+  if(!d?.profile){ c.innerHTML='<p style="color:var(--dim)">Profile not found.</p>'; return }
+  const prof = d.profile
+  const hist = d.history||[]
+  const isOwn = prof.id === U?.id
+  const wr = prof.total_rounds > 0 ? Math.round((prof.total_wins/prof.total_rounds)*100) : 0
+
+  c.innerHTML = `
+    <div class="card fi" style="text-align:center;padding:2rem 1.25rem;margin-bottom:1.1rem">
+      <div id="pav" style="width:72px;height:72px;border-radius:50%;background:${prof.avatar_color||'var(--red)'};color:var(--white);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.75rem;margin:0 auto 1rem">${ini(prof.display_name)}</div>
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:2rem;margin-bottom:.25rem" id="pname">${prof.display_name}</h2>
+      ${isOwn?`<button onclick="toggleEditProfile('${prof.id}','${prof.display_name}','${prof.avatar_color||'#e63329'}')" class="btn bg" style="display:inline-block;width:auto;padding:5px 14px;font-size:.8rem;margin-top:.5rem">Edit profile</button>`:''}
+    </div>
+    <div id="edit-area"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.1rem">
+      ${[[prof.total_wins,'Total wins','var(--green)'],[wr+'%','Win rate','var(--white)'],[prof.total_rounds,'Rounds','var(--white)'],[(prof.biggest_upset_pct||0)+'%','Best upset','var(--yellow)']].map(([v,l,col])=>`<div class="card" style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:${col};margin-bottom:2px">${v}</div><div style="font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">${l}</div></div>`).join('')}
+    </div>
+    ${prof.biggest_upset_fighter?`<div class="card fi" style="margin-bottom:1.1rem;border-left:3px solid var(--yellow)">
+      <p style="font-size:.65rem;color:var(--yellow);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">🔥 Biggest upset</p>
+      <p style="font-weight:500;margin-bottom:2px">${prof.biggest_upset_fighter}</p>
+      <p style="font-size:.78rem;color:var(--dim)">beat ${prof.biggest_upset_anchor} at ${prof.biggest_upset_pct}% win probability</p>
+    </div>`:''}
+    ${hist.length>0?`<p class="slbl">Recent history</p>${hist.map((r,i)=>`<div class="card fi" style="display:flex;align-items:center;gap:12px;margin-bottom:.5rem;animation-delay:${i*.04}s;opacity:${r.winner==='challenger'?1:.7}">
+      <div style="width:8px;height:8px;border-radius:50%;background:${r.winner==='challenger'?'var(--green)':'#c04040'};flex-shrink:0"></div>
+      <div style="flex:1"><div style="font-size:.875rem;font-weight:500">${r.challenger_name}</div><div style="font-size:.7rem;color:var(--dim)">vs ${r.anchor_name}</div></div>
+      <div style="text-align:right"><div style="font-size:.75rem;font-weight:600;color:${r.winner==='challenger'?'var(--green)':'#c04040'}">${r.winner==='challenger'?'WIN':'LOSS'}</div><div style="font-size:.65rem;color:var(--dim)">${r.challenger_win_pct}%</div></div>
+    </div>`).join('')}`:''}
+  `
+}
+
+function toggleEditProfile(id, name, color){
+  const area = document.getElementById('edit-area')
+  area.innerHTML = `
+    <div class="card" style="margin-bottom:1.1rem;background:#111">
+      <div class="field"><label>Display name</label><input type="text" id="edit-name" value="${name}" maxlength="30"></div>
+      <p class="slbl">Avatar color</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">
+        ${COLORS.map(c=>`<div onclick="selectColor('${c}')" id="col-${c.replace('#','')}" style="width:28px;height:28px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===color?'var(--white)':'transparent'};transition:border .15s"></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('edit-area').innerHTML=''" class="btn bg" style="flex:1">Cancel</button>
+        <button onclick="saveProfile('${id}')" class="btn br" style="flex:1" id="save-btn">Save</button>
+      </div>
+    </div>`
+  window._editColor = color
+}
+
+function selectColor(c){
+  document.querySelectorAll('[id^="col-"]').forEach(el=>el.style.border='3px solid transparent')
+  document.getElementById('col-'+c.replace('#','')).style.border='3px solid var(--white)'
+  window._editColor = c
+}
+
+async function saveProfile(id){
+  const btn = document.getElementById('save-btn')
+  btn.disabled=true; btn.textContent='Saving…'
+  const name = document.getElementById('edit-name').value.trim()
+  await fetch('/api/profile',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,display_name:name,avatar_color:window._editColor||'#e63329'})})
+  await loadProfile()
+  await showProfileById(id)
+}
+
+// ── CONFETTI ──────────────────────────────────────────────────────────────────
+function doConfetti(color){
+  const cols=[color,'#f5c842','#ffffff','#e63329','#1db954']
+  for(let i=0;i<55;i++) setTimeout(()=>{
+    const el=document.createElement('div'); el.className='confetti-piece'
+    el.style.left=(Math.random()*100)+'vw'; el.style.background=cols[Math.floor(Math.random()*cols.length)]
+    el.style.animationDuration=(2+Math.random()*2)+'s'; el.style.animationDelay=(Math.random()*.5)+'s'
+    const sz=(6+Math.random()*6)+'px'; el.style.width=sz; el.style.height=sz
+    document.body.appendChild(el); setTimeout(()=>el.remove(),4500)
+  },i*40)
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+init()
+</script>
+</body>
+</html>
